@@ -1,12 +1,9 @@
-
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from src.config import NUM_TRANSFORMERS, RANDOM_SEED
-
-
 # Eight assumed depot locations in Rajasthan.
 # Unequal weights control how transformers are distributed around depot towns.
 DEPOTS = [
@@ -33,7 +30,6 @@ def generate_locations(n=NUM_TRANSFORMERS, seed=RANDOM_SEED):
     latitudes = np.empty(n)
     longitudes = np.empty(n)
     area_types = np.empty(n, dtype=object)
-
     for i, depot_index in enumerate(depot_indices):
         depot = DEPOTS[depot_index]
 
@@ -41,13 +37,11 @@ def generate_locations(n=NUM_TRANSFORMERS, seed=RANDOM_SEED):
         # These are synthetic coordinates, not actual utility asset locations.
         rural = rng.random() < 0.65
         spread = rng.uniform(0.04, 0.18) if rural else rng.uniform(0.005, 0.04)
-
         latitudes[i] = depot["lat"] + rng.normal(0, spread)
         longitudes[i] = depot["lon"] + rng.normal(
             0, spread / max(np.cos(np.radians(depot["lat"])), 0.5)
         )
         area_types[i] = "rural" if rural else "urban"
-
     return pd.DataFrame(
         {
             "transformer_id": [f"TR-{i + 1:04d}" for i in range(n)],
@@ -62,7 +56,6 @@ def generate_locations(n=NUM_TRANSFORMERS, seed=RANDOM_SEED):
 def haversine_km(lat1, lon1, lat2, lon2):
     """Calculate great-circle distance in kilometres; supports NumPy arrays."""
     earth_radius_km = 6371.0
-
     lat1 = np.radians(np.asarray(lat1, dtype=float))
     lon1 = np.radians(np.asarray(lon1, dtype=float))
     lat2 = np.radians(np.asarray(lat2, dtype=float))
@@ -92,7 +85,6 @@ def assign_nearest_depot(transformers):
         depot_latitudes[None, :],
         depot_longitudes[None, :],
     )
-
     nearest_indices = np.argmin(distances, axis=1)
 
     result = transformers.copy()
@@ -128,14 +120,12 @@ def tune_intercept(linear_predictor, target_mean=0.11):
 
 def generate_dataset():
     rng = np.random.default_rng(RANDOM_SEED)
-
     transformers = generate_locations()
     n = len(transformers)
 
     # Synthetic equipment condition variables.
     transformers["age_years"] = rng.integers(1, 31, size=n)
     transformers["load_pct"] = rng.uniform(30, 110, size=n).round(2)
-
     # Temperature rises with load, with additional measurement/environment noise.
     temperature = (
         43.0
@@ -143,6 +133,21 @@ def generate_dataset():
         + rng.normal(0, 6.0, size=n)
     )
     transformers["oil_temp_c"] = np.clip(temperature, 40, 95).round(2)
+
+    # Regional fleet-condition differences are assumptions for this synthetic model,
+    # not measured facts about utility fleets in these towns.
+    older_hotter = {"Kota", "Bharatpur", "Alwar"}
+    younger_cooler = {"Tonk", "Dausa", "Jhalawar", "Sawai Madhopur"}
+    depot = transformers["generated_depot"]
+    age_shift = np.where(depot.isin(older_hotter), 6,
+                         np.where(depot.isin(younger_cooler), -4, 0))
+    temp_shift = age_shift.copy()
+    transformers["age_years"] = np.clip(
+        transformers["age_years"].to_numpy(dtype=int) + age_shift, 1, 30
+    ).astype(int)
+    transformers["oil_temp_c"] = np.clip(
+        transformers["oil_temp_c"].to_numpy(dtype=float) + temp_shift, 40, 95
+    ).round(2)
 
     # All three factors contribute to synthetic failure risk.
     # Coefficients are illustrative, not calibrated engineering parameters.
@@ -157,7 +162,6 @@ def generate_dataset():
     )
 
     intercept = tune_intercept(linear_predictor, target_mean=0.11)
-
     transformers["true_failure_prob"] = sigmoid(
         linear_predictor + intercept
     )
@@ -169,11 +173,9 @@ def generate_dataset():
 
     # Crucially, nearest depot is based on coordinates, not generated_depot.
     transformers = assign_nearest_depot(transformers)
-
     output_path = Path(__file__).resolve().parent.parent / "data" / "transformers.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     transformers.to_csv(output_path, index=False)
-
     print(f"Rows: {len(transformers)}")
     print(f"Mean true failure probability: {transformers['true_failure_prob'].mean():.4f}")
     print(f"Observed failure rate: {transformers['failed'].mean():.4f}")
@@ -187,7 +189,6 @@ def generate_dataset():
         .to_string()
     )
     print(f"\nSaved to: {output_path}")
-
     return transformers
 
 
