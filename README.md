@@ -288,4 +288,4 @@ Claude and ChatGPT were used for brainstorming, code guidance, and review. The s
 
 ## License
 
-MIT License (add a `LICENSE` file to the repository).
+MIT License 
