@@ -1,0 +1,5 @@
+scenario,comparison,mean_difference_pp,ci95_low_pp,ci95_high_pp
+normal,Risk-based minus Proportional count,0.823,0.69,0.956
+normal,Risk-based minus Equal split,1.706,1.522,1.891
+peak,Risk-based minus Proportional count,0.795,0.66,0.93
+peak,Risk-based minus Equal split,2.423,2.248,2.598
