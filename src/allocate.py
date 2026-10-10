@@ -100,8 +100,8 @@ def proportional_count(df=None, total_spares=NUM_SPARES):
 
 def risk_based(df=None, total_spares=NUM_SPARES):
     """
-    Allocate spares one at a time to the depot with the largest shortfall:
-    sum(predicted risk) minus spares already allocated there.
+    Allocate spares in proportion to each depot's total predicted
+    transformer failure risk, using largest-remainder rounding.
     """
     if df is None:
         df = load_data()
@@ -110,23 +110,15 @@ def risk_based(df=None, total_spares=NUM_SPARES):
         df.groupby("nearest_depot")["predicted_risk"]
         .sum()
         .reindex(DEPOT_NAMES, fill_value=0.0)
-        .to_dict()
+        .to_numpy(dtype=float)
     )
 
-    allocation = {name: 0 for name in DEPOT_NAMES}
+    allocation = _largest_remainder_allocation(
+        expected_failures,
+        total_spares,
+    )
 
-    for _ in range(total_spares):
-        depot = max(
-            DEPOT_NAMES,
-            key=lambda name: (
-                expected_failures[name] - allocation[name],
-                -DEPOT_NAMES.index(name),
-            ),
-        )
-        allocation[depot] += 1
-
-    return allocation
-
+    return dict(zip(DEPOT_NAMES, allocation.tolist()))
 
 def get_all_allocations(df=None, total_spares=NUM_SPARES):
     if df is None:
